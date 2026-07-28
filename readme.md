@@ -1,157 +1,706 @@
-31-cicd-tools
-Terraform configuration to provision CI/CD infrastructure for the roboshop project on AWS.
+# 31-cicd-tools
 
-Resources Created
-EC2 Instances
-Resource	Instance Type	AMI	Notes
-Jenkins Server	t3.small	Redhat-9-DevOps-Practice	Placed in public subnet; Jenkins installed via jenkins.sh
-Jenkins Agent	t3.micro	Redhat-9-DevOps-Practice	50 GB gp3 root volume; Java installed via jenkins-agent.sh
-SonarQube Server	t3.large	SolveDevOps-SonarQube-Server-Ubuntu24.04	20 GB gp3 root volume; conditional on var.sonar (default: true)
-Route 53 DNS Records
-Record	Type	Points To
-jenkins.<domain>	A	Jenkins server public IP
-jenkins-agent.<domain>	A	Jenkins agent private IP
-sonar.<domain>	A	SonarQube server public IP (created when var.sonar = true)
-Default domain: daws88s.online
+Terraform configuration to provision a complete **CI/CD infrastructure** for the **Roboshop** project on AWS.
 
-Data Sources (SSM Parameters read at apply time)
-/<project>/<env>/public_subnet_ids — public subnet for instance placement
-/<project>/<env>/jenkins_sg_id — security group applied to Jenkins server and agent
-/<project>/<env>/jenkins_agent_sg_id — security group for Jenkins agent
-/<project>/<env>/sonar_sg_id — security group applied to SonarQube server
-Variables
-Variable	Default	Description
-project	roboshop	Project name used in resource names and tags
-environment	dev	Environment name used in resource names and tags
-zone_id	Z05013202FKF0ZL12WAOP	Route 53 hosted zone ID
-domain_name	daws88s.online	Base domain for DNS records
-sonar	true	Set to false to skip SonarQube instance and its DNS record
-To provision without SonarQube:
+---
 
+# Architecture
+
+```
+                 GitHub
+                    │
+                    ▼
+              Jenkins Server
+                    │
+        ┌───────────┴───────────┐
+        ▼                       ▼
+  Jenkins Agent            SonarQube
+        │                       │
+        └───────────┬───────────┘
+                    ▼
+              Quality Reports
+```
+
+---
+
+# Infrastructure Created
+
+## EC2 Instances
+
+| Resource | Instance Type | AMI | Purpose |
+|----------|---------------|-----|---------|
+| Jenkins Server | t3.small | Redhat-9-DevOps-Practice | Jenkins controller installed using `jenkins.sh` |
+| Jenkins Agent | t3.micro | Redhat-9-DevOps-Practice | Jenkins build agent with Java installed using `jenkins-agent.sh` |
+| SonarQube Server | t3.large | SolveDevOps-SonarQube-Server-Ubuntu24.04 | SonarQube server (created only when `var.sonar=true`) |
+
+### Storage
+
+| Instance | Root Volume |
+|-----------|-------------|
+| Jenkins Server | Default |
+| Jenkins Agent | 50 GB gp3 |
+| SonarQube | 20 GB gp3 |
+
+---
+
+# Route53 DNS Records
+
+| DNS Record | Type | Points To |
+|------------|------|-----------|
+| `jenkins.<domain>` | A | Jenkins Server Public IP |
+| `jenkins-agent.<domain>` | A | Jenkins Agent Private IP |
+| `sonar.<domain>` | A | SonarQube Public IP (only when Sonar enabled) |
+
+Default Domain
+
+```
+daws88s.online
+```
+
+---
+
+# SSM Parameters Used
+
+Terraform reads these values during apply.
+
+| Parameter | Description |
+|-----------|-------------|
+| `/<project>/<env>/public_subnet_ids` | Public subnet ID |
+| `/<project>/<env>/jenkins_sg_id` | Jenkins Security Group |
+| `/<project>/<env>/jenkins_agent_sg_id` | Jenkins Agent Security Group |
+| `/<project>/<env>/sonar_sg_id` | SonarQube Security Group |
+
+---
+
+# Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| project | roboshop | Project Name |
+| environment | dev | Environment |
+| zone_id | Z05013202FKF0ZL12WAOP | Route53 Hosted Zone ID |
+| domain_name | daws88s.online | Base Domain |
+| sonar | true | Enable or Disable SonarQube |
+
+---
+
+# Deploy Without SonarQube
+
+```bash
 terraform apply -var="sonar=false"
-Jenkins Setup
-Once you setup and login to jenkins.
+```
 
-Plugins
-Pipeline stage view
-Pipeline utility steps
-AWS creds
-AWS Steps
-Sonarqube scanner
-Multibranch Scan Webhook Trigger
-JIRA Pipeline Steps
-Generic webhook trigger
-Credentials
-ssh-creds
-aws-creds
-sonar-creds
-github-token
-Create fine grained token
-Under profile -> Settings -> Developer Settings -> Fine grained token
-Select all repos
-Permissions
-Dependabot alerts -> Read
-Commit statuses -> Read and Write
-Code -> Read and Write
-jira-creds (JIRA free trail)
-Master Node architecture
-jenkins agent is jenkins-agent.daws88s.online
-roboshop as label
-Sonar
-Scanner Tool configuration -> sonar-8
-Server configuration in system -> sonar-server
-Sonar Authentication token
-Webhook
-Standard mode
-Quality gate creation
-Jenkins shared library
-configure jenkins-shared-library repo in Manage Jenkins -> System -> Global trusted library section
-🐞 Bugs
-An issue representing a coding error that will likely cause unexpected behavior or application failure. This seems fine but sometimes it may break in production.
+---
 
-🔐 Vulnerabilities
-A security-related holes that can be exploited by attackers. This can be hacked
+# Jenkins Configuration
 
-👃 Code Smells
-A maintainability issue that does not break the app but makes the code hard to understand, change, or maintain. This works today, but hurts tomorrow
+After opening Jenkins for the first time:
 
-Technical Debt: It is the estimated time required to fix all maintainability issues (code smells) in the codebase. That future pain = technical debt
+```
+http://jenkins.<domain>:8080
+```
 
-Example: Your project has: 100 code smells Each smell estimated as 10 minutes to fix
+Complete the setup wizard and install the required plugins.
 
-Technical Debt = 100 × 10 min = 1000 minutes ≈ 16.6 hours
-Example timings SonarQube assumes:
-Rename variable → 2 min
-Reduce complexity → 30 min
-Remove duplication → 1h
+---
 
-📋 Duplication
-Percentage or blocks of identical or near-identical code across files. copy-paste risk. Should be made as function and reuse it.
+# Required Plugins
 
-📊 Coverage
-Percentage of code that is executed by unit tests.
+- Pipeline Stage View
+- Pipeline Utility Steps
+- AWS Credentials
+- AWS Steps
+- SonarQube Scanner
+- Multibranch Scan Webhook Trigger
+- JIRA Pipeline Steps
+- Generic Webhook Trigger
 
-Coverage = (Lines covered by tests / Lines to cover) × 100
-Unit testing will give us a JSON report
+---
 
-Total test cases executed
-How many passed, How many failed
-This report should be uploaded to SonarQube server through agent.
+# Jenkins Credentials
 
-🔒 Security Rating
-Rating based on severity of vulnerabilities
+Create the following credentials.
 
-Ratings logic: A → No vulnerabilities B–E → Based on highest severity found
+| Credential ID | Purpose |
+|--------------|---------|
+| ssh-creds | SSH Authentication |
+| aws-creds | AWS Access |
+| sonar-creds | Sonar Authentication Token |
+| github-token | GitHub Personal Access Token |
+| jira-creds | JIRA API Credentials |
 
-Example: 1 Critical vulnerability → Rating becomes E
-Security Rating = worst vulnerability decides
+---
 
-🛠️ Maintainability Rating
-Rating based on Technical Debt Ratio Technical Debt Ratio formula:
+# GitHub Fine-Grained Token
 
-(Total remediation cost / Development cost) × 100
-1️⃣ Total Remediation Cost (SonarQube) What it means Example: Total time required to fix all Code Smells in the codebase.
+Navigate to
 
-Code Smell	Fix Time
-Long method	30 min
-Duplicate code	1 hour
-Bad variable name	2 min
-Total remediation cost = 1h 32m
-2️⃣ Development Cost (SonarQube) What it means? Estimated time it would take to write the existing code from scratch. SonarQube uses a fixed heuristic: Development cost = Lines of Code × 30 minutes (30 minutes per line is SonarQube’s default assumption)
+```
+Profile
+    ↓
+Settings
+    ↓
+Developer Settings
+    ↓
+Fine-grained Personal Access Token
+```
+
+Select
+
+```
+All Repositories
+```
+
+Required Permissions
+
+| Permission | Access |
+|------------|--------|
+| Code | Read & Write |
+| Commit Statuses | Read & Write |
+| Dependabot Alerts | Read |
+
+---
+
+# Jenkins Master Node
+
+Configure
+
+```
+Agent Name:
+jenkins-agent.daws88s.online
+```
+
+Label
+
+```
+roboshop
+```
+
+---
+
+# SonarQube Configuration
+
+## Scanner Tool
+
+```
+Manage Jenkins
+
+↓
+
+Global Tool Configuration
+
+↓
+
+Sonar Scanner
+
+↓
+
+Name
+
+sonar-8
+```
+
+---
+
+## Sonar Server
+
+```
+Manage Jenkins
+
+↓
+
+System
+
+↓
+
+SonarQube Servers
+
+↓
+
+Name
+
+sonar-server
+```
+
+Add
+
+- Server URL
+- Authentication Token
+
+---
+
+# SonarQube Webhook
+
+```
+Administration
+
+↓
+
+Configuration
+
+↓
+
+Webhooks
+
+↓
+
+Create Webhook
+```
+
+Mode
+
+```
+Standard
+```
+
+---
+
+# Configure Quality Gate
+
+Create a Quality Gate inside SonarQube and use it in Jenkins Pipeline.
+
+---
+
+# Jenkins Shared Library
+
+Configure Global Trusted Library.
+
+```
+Manage Jenkins
+
+↓
+
+System
+
+↓
+
+Global Trusted Pipeline Libraries
+```
+
+Repository
+
+```
+jenkins-shared-library
+```
+
+---
+
+# SonarQube Metrics
+
+## 🐞 Bugs
+
+A **Bug** is a coding mistake that may cause unexpected application behavior or failure.
 
 Example
 
-Lines of Code: 1,000
+- Null Pointer Exception
+- Array Index Out of Bounds
+- Division by Zero
 
-Development cost = 1,000 × 30 min = 30,000 min ≈ 500 hours
-Real Example: Lines of Code: 2,000
+**Impact**
 
-Development cost = 2,000 × 30 min = 1,000 hours Total remediation cost = 50 hours
+Application stability.
 
-Technical Debt Ratio = (50 / 1000) × 100 = 5%
-Ratings: A → ≤ 5%
+---
 
-B → 6–10%
+## 🔐 Vulnerabilities
 
-C → 11–20%
+A **Vulnerability** is a security weakness that attackers can exploit.
 
-D → 21–50%
+Examples
 
-E → > 50%
+- SQL Injection
+- Cross-Site Scripting (XSS)
+- Hardcoded Passwords
 
-Driven mainly by:
+**Impact**
 
-Code smells
+Security of the application.
 
-Complexity
+---
 
-Duplication
+## 👃 Code Smells
 
-➡️ Maintainability Rating = future change effort
+A **Code Smell** is not a bug.
 
-🎯 Reliability Rating
-Rating based on Bugs severity
+The application works correctly, but the code is difficult to understand, maintain, or extend.
 
-Blocker/Critical bugs push rating down fast
+Examples
 
-➡️ Reliability = stability of the app
+- Long Methods
+- Duplicate Code
+- Unused Variables
+- Large Classes
+- Poor Naming
+
+**Impact**
+
+Maintainability.
+
+---
+
+# Technical Debt
+
+Technical Debt is the estimated time required to fix all maintainability issues.
+
+Example
+
+```
+100 Code Smells
+
+Each requires
+
+10 minutes
+
+Technical Debt
+
+100 × 10
+
+=
+
+1000 minutes
+
+≈16.6 hours
+```
+
+Typical SonarQube Estimates
+
+| Issue | Estimated Fix Time |
+|--------|-------------------|
+| Rename Variable | 2 minutes |
+| Remove Duplication | 1 hour |
+| Reduce Complexity | 30 minutes |
+
+---
+
+# 📋 Duplication
+
+Duplication measures repeated or nearly identical code.
+
+Example
+
+```
+File A
+
+login()
+
+File B
+
+login()
+
+Same code copied twice.
+```
+
+Better approach
+
+Create one reusable function.
+
+---
+
+# 📊 Coverage
+
+Coverage measures how much source code is executed during unit testing.
+
+Formula
+
+```
+Coverage
+
+=
+
+(Lines Covered / Lines to Cover)
+
+×
+
+100
+```
+
+Example
+
+```
+Total Lines
+
+1000
+
+Covered
+
+850
+
+Coverage
+
+85%
+```
+
+Unit testing generates reports such as
+
+- Total Test Cases
+- Passed
+- Failed
+- Coverage
+
+The Jenkins Agent uploads these reports to SonarQube.
+
+---
+
+# 🔒 Security Rating
+
+Security Rating depends on the highest severity vulnerability.
+
+| Rating | Meaning |
+|---------|---------|
+| A | No Vulnerabilities |
+| B | Minor Issues |
+| C | Moderate Issues |
+| D | Major Issues |
+| E | Critical Vulnerability |
+
+Example
+
+```
+1 Critical Vulnerability
+
+↓
+
+Security Rating
+
+E
+```
+
+---
+
+# 🛠️ Maintainability Rating
+
+Maintainability Rating is calculated using the Technical Debt Ratio.
+
+Formula
+
+```
+Technical Debt Ratio
+
+=
+
+(Remediation Cost / Development Cost)
+
+×
+
+100
+```
+
+---
+
+## Total Remediation Cost
+
+Time required to fix all Code Smells.
+
+Example
+
+| Issue | Time |
+|-------|------|
+| Duplicate Code | 1 Hour |
+| Long Method | 30 Minutes |
+| Variable Rename | 2 Minutes |
+
+Total
+
+```
+1 Hour 32 Minutes
+```
+
+---
+
+## Development Cost
+
+SonarQube estimates the development effort as:
+
+```
+Development Cost
+
+=
+
+Lines of Code
+
+×
+
+30 Minutes
+```
+
+Example
+
+```
+1000 Lines
+
+↓
+
+1000 × 30
+
+↓
+
+30000 Minutes
+
+↓
+
+500 Hours
+```
+
+---
+
+## Example
+
+```
+Lines of Code
+
+2000
+
+Development Cost
+
+1000 Hours
+
+Remediation Cost
+
+50 Hours
+
+Technical Debt Ratio
+
+50 / 1000
+
+=
+
+5%
+```
+
+---
+
+## Maintainability Ratings
+
+| Ratio | Rating |
+|-------|--------|
+| ≤5% | A |
+| 6–10% | B |
+| 11–20% | C |
+| 21–50% | D |
+| >50% | E |
+
+Factors affecting Maintainability
+
+- Code Smells
+- Complexity
+- Duplication
+
+Maintainability indicates how easy it is to modify and maintain the application in the future.
+
+---
+
+# 🎯 Reliability Rating
+
+Reliability measures application stability.
+
+It is based on the severity of Bugs.
+
+| Rating | Meaning |
+|---------|---------|
+| A | No Bugs |
+| B | Minor Bugs |
+| C | Moderate Bugs |
+| D | Major Bugs |
+| E | Critical Bugs |
+
+Critical or Blocker bugs reduce the Reliability Rating significantly.
+
+---
+
+# CI/CD Workflow
+
+```
+Developer
+
+↓
+
+GitHub
+
+↓
+
+Webhook
+
+↓
+
+Jenkins
+
+↓
+
+Checkout Code
+
+↓
+
+Build
+
+↓
+
+Unit Testing
+
+↓
+
+Generate Coverage Report
+
+↓
+
+SonarQube Scan
+
+↓
+
+Quality Gate
+
+↓
+
+Docker Build
+
+↓
+
+Push Image to Amazon ECR
+
+↓
+
+Deploy to Kubernetes / EKS
+```
+
+---
+
+# Project Structure
+
+```
+31-cicd-tools
+│
+├── main.tf
+├── variables.tf
+├── outputs.tf
+├── datasource.tf
+├── route53.tf
+├── ec2.tf
+├── jenkins.sh
+├── jenkins-agent.sh
+├── sonarqube.sh
+└── README.md
+```
+
+---
+
+# Cleanup
+
+Destroy all resources:
+
+```bash
+terraform destroy
+```
+
+Destroy without SonarQube:
+
+```bash
+terraform destroy -var="sonar=false"
+```
+
+---
+
+# Author
+
+**Rakesh Sirupa**
+
+DevOps | AWS | Terraform | Jenkins | Docker | Kubernetes | SonarQube | CI/CD
