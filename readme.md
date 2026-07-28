@@ -7,19 +7,19 @@ Terraform configuration to provision a complete **CI/CD infrastructure** for the
 # Architecture
 
 ```
-                                            GitHub
-                                                │
-                                                ▼
-                                        Jenkins Server
-                                                │
-                                    ┌───────────┴───────────┐
-                                    ▼                       ▼
-                            Jenkins Agent            SonarQube
-                                    │                       │
-                                    └───────────┬───────────┘
-                                                ▼
-                                        Quality Reports
-                            ```
+                 GitHub
+                    │
+                    ▼
+              Jenkins Server
+                    │
+        ┌───────────┴───────────┐
+        ▼                       ▼
+  Jenkins Agent            SonarQube
+        │                       │
+        └───────────┬───────────┘
+                    ▼
+              Quality Reports
+```
 
 ---
 
@@ -54,7 +54,7 @@ Terraform configuration to provision a complete **CI/CD infrastructure** for the
 Default Domain
 
 ```
-rakeshdev.online
+daws88s.online
 ```
 
 ---
