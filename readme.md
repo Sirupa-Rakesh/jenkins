@@ -54,7 +54,7 @@ Terraform configuration to provision a complete **CI/CD infrastructure** for the
 Default Domain
 
 ```
-daws88s.online
+rakeshdev.online
 ```
 
 ---
